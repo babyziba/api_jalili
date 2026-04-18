@@ -159,7 +159,7 @@
   <div class="main">
     <div class="left">
       <h2>Featured Artwork</h2>
-      <p>This card uses Popmotion animate().</p>
+      <p>This card uses Anime.js.</p>
 
       <div id="animationArea">
         <div id="featuredCard">
@@ -177,7 +177,7 @@
     <div class="right">
       <h2>Project Info</h2>
       <p><strong>API:</strong> Met Museum API</p>
-      <p><strong>Animation:</strong> Popmotion animate()</p>
+      <p><strong>Animation:</strong> Anime.js</p>
       <p id="status">Status: Ready</p>
     </div>
   </div>
@@ -185,7 +185,7 @@
   <h2>Results</h2>
   <div id="results"></div>
 
-  <script src="https://unpkg.com/popmotion@11.0.5/dist/popmotion.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
   <script>
     const searchInput = document.getElementById("searchInput");
     const searchBtn = document.getElementById("searchBtn");
@@ -201,10 +201,6 @@
     const featuredLink = document.getElementById("featuredLink");
     const featuredCard = document.getElementById("featuredCard");
 
-    let currentX = 0;
-
-    console.log("Popmotion:", window.popmotion);
-
     searchBtn.addEventListener("click", function () {
       const keyword = searchInput.value.trim();
 
@@ -218,8 +214,8 @@
     });
 
     resetBtn.addEventListener("click", function () {
-      currentX = 0;
-      featuredCard.style.transform = "translateX(0px)";
+      anime.remove("#featuredCard");
+      featuredCard.style.transform = "translateX(0px) rotate(0deg) scale(1)";
       statusText.textContent = "Status: Reset";
     });
 
@@ -278,8 +274,8 @@
       featuredDate.textContent = art.objectDate || "Unknown date";
       featuredLink.href = art.objectURL || "#";
 
-      currentX = 0;
-      featuredCard.style.transform = "translateX(0px)";
+      anime.remove("#featuredCard");
+      featuredCard.style.transform = "translateX(0px) rotate(0deg) scale(1)";
     }
 
     function showResults(artworks) {
@@ -304,37 +300,21 @@
     }
 
     function runAnimation() {
-      if (!window.popmotion || !window.popmotion.animate) {
-        statusText.textContent = "Status: Popmotion failed to load";
-        return;
-      }
+      statusText.textContent = "Status: Animation running";
 
-      const animate = window.popmotion.animate;
+      anime.remove("#featuredCard");
 
-      animate({
-        from: 0,
-        to: 250,
-        duration: 1000,
-        onUpdate: function (value) {
-          currentX = value;
-          featuredCard.style.transform = "translateX(" + value + "px)";
-        },
-        onComplete: function () {
+      anime({
+        targets: "#featuredCard",
+        translateX: [0, 180, 0],
+        rotate: [0, 6, 0],
+        scale: [1, 1.05, 1],
+        duration: 1200,
+        easing: "easeInOutSine",
+        complete: function () {
           statusText.textContent = "Status: Animation complete";
-
-          animate({
-            from: 250,
-            to: 0,
-            duration: 1000,
-            onUpdate: function (value) {
-              currentX = value;
-              featuredCard.style.transform = "translateX(" + value + "px)";
-            }
-          });
         }
       });
-
-      statusText.textContent = "Status: Animation running";
     }
 
     fetchArt("cat");
