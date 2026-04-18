@@ -1,192 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Met Art Explorer</title>
-  <meta
-    name="description"
-    content="Explore artwork from The Metropolitan Museum of Art with a draggable Popmotion-powered featured card."
-  />
-  <link rel="preconnect" href="https://images.metmuseum.org" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="page-shell">
-    <header class="hero">
-      <nav class="topbar">
-        <div class="brand-wrap">
-          <div class="brand-badge">MET</div>
-          <div>
-            <h1>Met Art Explorer</h1>
-            <p class="subtitle">
-              Search museum art, view real object data, and drag the featured card with Popmotion inertia.
-            </p>
-          </div>
-        </div>
 
-        <div class="link-pills">
-          <a
-            class="pill"
-            href="https://metmuseum.github.io/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            API Docs
-          </a>
-          <a
-            class="pill"
-            href="https://www.popmotion.io/api/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Popmotion Docs
-          </a>
-        </div>
-      </nav>
+  <h1>Met Art Explorer</h1>
+  <p>Search for artwork from The Met Museum API</p>
 
-      <section class="search-panel">
-        <div class="search-copy">
-          <h2>Discover artwork by keyword</h2>
-          <p>
-            Try searches like <span>cats</span>, <span>samurai</span>, <span>armor</span>,
-            <span>flowers</span>, or <span>Egypt</span>.
-          </p>
-        </div>
-
-        <form id="searchForm" class="search-form">
-          <div class="input-group">
-            <input
-              id="searchInput"
-              type="text"
-              placeholder="Search artwork..."
-              aria-label="Search artwork"
-              value="samurai"
-            />
-            <button id="searchBtn" type="submit">Search</button>
-          </div>
-
-          <div class="filters">
-            <label class="checkbox-wrap">
-              <input id="hasImagesOnly" type="checkbox" checked />
-              <span>Only show artworks with images</span>
-            </label>
-
-            <label class="limit-wrap">
-              <span>Results:</span>
-              <select id="limitSelect" aria-label="Number of results">
-                <option value="6">6</option>
-                <option value="8" selected>8</option>
-                <option value="10">10</option>
-                <option value="12">12</option>
-              </select>
-            </label>
-          </div>
-        </form>
-      </section>
-    </header>
-
-    <main class="content-grid">
-      <section class="featured-section glass-card">
-        <div class="section-head">
-          <h3>Featured Artwork</h3>
-          <p>Drag this card and release it to see Popmotion inertia in action.</p>
-        </div>
-
-        <div id="dragBounds" class="drag-bounds">
-          <article id="featuredCard" class="featured-card" tabindex="0" aria-label="Featured artwork card">
-            <div class="featured-image-wrap">
-              <img
-                id="featuredImage"
-                src=""
-                alt="Featured artwork"
-              />
-              <div class="image-overlay">
-                <span class="overlay-chip">Drag me</span>
-              </div>
-            </div>
-
-            <div class="featured-info">
-              <div class="meta-row">
-                <span id="featuredDepartment" class="tag">Department</span>
-                <span id="featuredDate" class="tag soft">Date</span>
-              </div>
-
-              <h4 id="featuredTitle">Search for artwork</h4>
-              <p id="featuredArtist" class="artist-line">Artist details will appear here.</p>
-              <p id="featuredCulture" class="detail-line"></p>
-              <p id="featuredMedium" class="detail-line"></p>
-
-              <div class="featured-actions">
-                <a
-                  id="featuredLink"
-                  class="action-link"
-                  href="#"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  View on Met Museum
-                </a>
-              </div>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <aside class="info-panel glass-card">
-        <div class="section-head">
-          <h3>Project Features</h3>
-        </div>
-
-        <ul class="feature-list">
-          <li>Native <code>fetch()</code> API calls</li>
-          <li>Responsive CSS Grid gallery</li>
-          <li>Flexbox card layouts</li>
-          <li>Glassmorphism styling</li>
-          <li>Popmotion <code>pointer()</code> drag tracking</li>
-          <li>Popmotion <code>inertia()</code> release motion</li>
-        </ul>
-
-        <div class="mini-card">
-          <h4>Status</h4>
-          <p id="statusText">Ready to search.</p>
-        </div>
-
-        <div class="mini-card">
-          <h4>Methods Used</h4>
-          <p>
-            Met API: search endpoint + object details endpoint<br />
-            Popmotion: <code>pointer()</code>, <code>inertia()</code>
-          </p>
-        </div>
-      </aside>
-    </main>
-
-    <section class="results-section">
-      <div class="results-header">
-        <h3>Gallery Results</h3>
-        <p id="resultsSummary">No results loaded yet.</p>
-      </div>
-
-      <div id="loadingState" class="loading-state hidden">
-        <div class="loader"></div>
-        <p>Loading artwork...</p>
-      </div>
-
-      <div id="emptyState" class="empty-state hidden">
-        <h4>No artwork found</h4>
-        <p>Try a different keyword like “armor”, “birds”, or “portrait”.</p>
-      </div>
-
-      <div id="resultsGrid" class="results-grid"></div>
-    </section>
-
-    <footer class="footer">
-      <p>
-        Built for COMP 584 using The Met Collection API and Popmotion.
-      </p>
-    </footer>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Enter a keyword" value="samurai">
+    <button id="searchBtn">Search</button>
   </div>
+
+  <div class="main-container">
+    <div class="left-panel">
+      <h2>Featured Artwork</h2>
+      <p>Drag the card and release it to see Popmotion inertia.</p>
+
+      <div id="dragArea">
+        <div id="featuredCard">
+          <img id="featuredImage" src="" alt="Artwork image">
+          <div class="card-text">
+            <h3 id="featuredTitle">Artwork title</h3>
+            <p id="featuredArtist">Artist name</p>
+            <p id="featuredDate">Date</p>
+            <a id="featuredLink" href="#" target="_blank">View on Museum Site</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="right-panel">
+      <h2>Project Info</h2>
+      <p><strong>API:</strong> Met Museum API</p>
+      <p><strong>Animation:</strong> Popmotion pointer() and inertia()</p>
+      <p id="status">Status: Ready</p>
+    </div>
+  </div>
+
+  <h2>Results</h2>
+  <div id="results"></div>
 
   <script src="https://unpkg.com/popmotion/dist/popmotion.global.min.js"></script>
   <script src="script.js"></script>
