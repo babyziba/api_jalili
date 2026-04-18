@@ -30,6 +30,7 @@
       padding: 8px 12px;
       font-size: 16px;
       cursor: pointer;
+      margin-right: 8px;
     }
 
     .main {
@@ -53,9 +54,9 @@
       flex: 1;
     }
 
-    #dragArea {
+    #animationArea {
       width: 100%;
-      height: 480px;
+      height: 460px;
       border: 1px dashed #888;
       position: relative;
       overflow: hidden;
@@ -70,7 +71,6 @@
       top: 10px;
       background: white;
       border: 1px solid #666;
-      cursor: grab;
     }
 
     #featuredImage {
@@ -128,11 +128,6 @@
     .result-card p {
       margin: 4px 0;
     }
-
-    .note {
-      color: #444;
-      font-size: 14px;
-    }
   </style>
 </head>
 <body>
@@ -142,14 +137,16 @@
   <div class="search-box">
     <input type="text" id="searchInput" value="cat" placeholder="Enter keyword">
     <button id="searchBtn">Search</button>
+    <button id="animateBtn">Animate Card</button>
+    <button id="resetBtn">Reset Card</button>
   </div>
 
   <div class="main">
     <div class="left">
       <h2>Featured Artwork</h2>
-      <p>Drag the card and release it to see the animation.</p>
+      <p>This card uses Popmotion inertia animation.</p>
 
-      <div id="dragArea">
+      <div id="animationArea">
         <div id="featuredCard">
           <img id="featuredImage" src="" alt="Artwork image">
           <div class="card-text">
@@ -165,19 +162,20 @@
     <div class="right">
       <h2>Project Info</h2>
       <p><strong>API:</strong> Met Museum API</p>
-      <p><strong>Animation:</strong> Popmotion pointer() and inertia()</p>
+      <p><strong>Animation:</strong> Popmotion inertia()</p>
       <p id="status">Status: Ready</p>
-      <p class="note">If Popmotion fails to load, the API still works.</p>
     </div>
   </div>
 
   <h2>Results</h2>
   <div id="results"></div>
 
-  <script src="https://unpkg.com/popmotion/dist/popmotion.global.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popmotion/11.0.5/popmotion.min.js"></script>
   <script>
     const searchInput = document.getElementById("searchInput");
     const searchBtn = document.getElementById("searchBtn");
+    const animateBtn = document.getElementById("animateBtn");
+    const resetBtn = document.getElementById("resetBtn");
     const resultsDiv = document.getElementById("results");
     const statusText = document.getElementById("status");
 
@@ -188,16 +186,29 @@
     const featuredLink = document.getElementById("featuredLink");
 
     const featuredCard = document.getElementById("featuredCard");
-    const dragArea = document.getElementById("dragArea");
+    const animationArea = document.getElementById("animationArea");
 
     let currentX = 0;
     let currentY = 0;
+    let xAnimation = null;
+    let yAnimation = null;
 
     searchBtn.addEventListener("click", function () {
       const keyword = searchInput.value.trim();
       if (keyword) {
         fetchArt(keyword);
       }
+    });
+
+    animateBtn.addEventListener("click", function () {
+      runInertiaAnimation();
+    });
+
+    resetBtn.addEventListener("click", function () {
+      stopAnimations();
+      currentX = 0;
+      currentY = 0;
+      updateCardPosition();
     });
 
     async function fetchArt(keyword) {
@@ -257,7 +268,7 @@
 
       currentX = 0;
       currentY = 0;
-      featuredCard.style.transform = "translate(0px, 0px)";
+      updateCardPosition();
     }
 
     function showResults(artworks) {
@@ -281,128 +292,65 @@
       }
     }
 
-    function setupPopmotionDrag() {
-      if (!window.popmotion) {
-        console.log("Popmotion did not load.");
-        return;
+    function updateCardPosition() {
+      featuredCard.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
+    }
+
+    function stopAnimations() {
+      if (xAnimation) {
+        xAnimation.stop();
+        xAnimation = null;
       }
 
-      const pointer = window.popmotion.pointer;
-      const inertia = window.popmotion.inertia;
-
-      if (!pointer || !inertia) {
-        console.log("Popmotion functions missing.");
-        return;
-      }
-
-      let dragMove = null;
-
-      featuredCard.addEventListener("mousedown", startDrag);
-      featuredCard.addEventListener("touchstart", startDrag, { passive: false });
-
-      function startDrag(e) {
-        e.preventDefault();
-
-        if (dragMove) {
-          dragMove.stop();
-        }
-
-        const startPoint = getPoint(e);
-        const startX = currentX;
-        const startY = currentY;
-
-        let lastX = startPoint.x;
-        let lastY = startPoint.y;
-        let velocityX = 0;
-        let velocityY = 0;
-        let lastTime = Date.now();
-
-        dragMove = pointer().start(function (point) {
-          const newX = startX + (point.x - startPoint.x);
-          const newY = startY + (point.y - startPoint.y);
-
-          setCardPosition(newX, newY);
-
-          const now = Date.now();
-          const dt = now - lastTime || 1;
-
-          velocityX = ((point.x - lastX) / dt) * 16;
-          velocityY = ((point.y - lastY) / dt) * 16;
-
-          lastX = point.x;
-          lastY = point.y;
-          lastTime = now;
-        });
-
-        function endDrag() {
-          if (dragMove) {
-            dragMove.stop();
-          }
-
-          const bounds = getBounds();
-
-          inertia({
-            from: currentX,
-            velocity: velocityX,
-            min: bounds.minX,
-            max: bounds.maxX
-          }).start(function (value) {
-            currentX = value;
-            featuredCard.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
-          });
-
-          inertia({
-            from: currentY,
-            velocity: velocityY,
-            min: bounds.minY,
-            max: bounds.maxY
-          }).start(function (value) {
-            currentY = value;
-            featuredCard.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
-          });
-
-          document.removeEventListener("mouseup", endDrag);
-          document.removeEventListener("touchend", endDrag);
-        }
-
-        document.addEventListener("mouseup", endDrag);
-        document.addEventListener("touchend", endDrag);
+      if (yAnimation) {
+        yAnimation.stop();
+        yAnimation = null;
       }
     }
 
-    function setCardPosition(x, y) {
-      currentX = x;
-      currentY = y;
-      featuredCard.style.transform = "translate(" + x + "px, " + y + "px)";
-    }
+    function runInertiaAnimation() {
+      if (!window.popmotion || !window.popmotion.inertia) {
+        statusText.textContent = "Status: Popmotion failed to load";
+        return;
+      }
 
-    function getBounds() {
-      const areaRect = dragArea.getBoundingClientRect();
+      stopAnimations();
+
+      const areaRect = animationArea.getBoundingClientRect();
       const cardRect = featuredCard.getBoundingClientRect();
 
-      return {
-        minX: 0,
-        minY: 0,
-        maxX: areaRect.width - cardRect.width - 20,
-        maxY: areaRect.height - cardRect.height - 20
-      };
+      const maxX = areaRect.width - cardRect.width - 20;
+      const maxY = areaRect.height - cardRect.height - 20;
+
+      const inertia = window.popmotion.inertia;
+
+      xAnimation = inertia({
+        from: 0,
+        velocity: 250,
+        min: 0,
+        max: maxX,
+        bounceStiffness: 120,
+        bounceDamping: 10
+      }).start(function (value) {
+        currentX = value;
+        updateCardPosition();
+      });
+
+      yAnimation = inertia({
+        from: 0,
+        velocity: 180,
+        min: 0,
+        max: maxY,
+        bounceStiffness: 120,
+        bounceDamping: 10
+      }).start(function (value) {
+        currentY = value;
+        updateCardPosition();
+      });
+
+      statusText.textContent = "Status: Animation running";
     }
 
-    function getPoint(e) {
-      if (e.touches && e.touches.length > 0) {
-        return {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY
-        };
-      }
-
-      return {
-        x: e.clientX,
-        y: e.clientY
-      };
-    }
-
-    setupPopmotionDrag();
     fetchArt("cat");
   </script>
 </body>
