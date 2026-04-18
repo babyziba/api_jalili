@@ -17,7 +17,7 @@ const { pointer, inertia } = window.popmotion;
 let currentX = 0;
 let currentY = 0;
 let dragMove = null;
-
+//searching that calls function that fetches artwork data
 searchBtn.addEventListener("click", function () {
   const keyword = searchInput.value.trim();
   if (keyword !== "") {
@@ -27,7 +27,7 @@ searchBtn.addEventListener("click", function () {
 
 async function fetchArt(keyword) {
   statusText.textContent = "Status: Loading...";
-//Fetching data from the API
+//Fetching data from the met API
   try {
     const searchUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=${encodeURIComponent(keyword)}`;
     const searchResponse = await fetch(searchUrl);
@@ -42,7 +42,7 @@ async function fetchArt(keyword) {
     const ids = searchData.objectIDs.slice(0, 8);
 
     let artworks = [];
-
+    //gets the actual artwork info for each result.
     for (let i = 0; i < ids.length; i++) {
       const objectResponse = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${ids[i]}`);
       const objectData = await objectResponse.json();
