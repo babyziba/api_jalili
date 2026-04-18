@@ -27,7 +27,7 @@ searchBtn.addEventListener("click", function () {
 
 async function fetchArt(keyword) {
   statusText.textContent = "Status: Loading...";
-
+//Fetching data from the API
   try {
     const searchUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=${encodeURIComponent(keyword)}`;
     const searchResponse = await fetch(searchUrl);
