@@ -1,372 +1,209 @@
-const MET_SEARCH_URL = "https://collectionapi.metmuseum.org/public/collection/v1/search";
-const MET_OBJECT_URL = "https://collectionapi.metmuseum.org/public/collection/v1/objects";
-
-const form = document.getElementById("searchForm");
 const searchInput = document.getElementById("searchInput");
 const searchBtn = document.getElementById("searchBtn");
-const hasImagesOnly = document.getElementById("hasImagesOnly");
-const limitSelect = document.getElementById("limitSelect");
+const resultsDiv = document.getElementById("results");
+const statusText = document.getElementById("status");
 
-const statusText = document.getElementById("statusText");
-const resultsSummary = document.getElementById("resultsSummary");
-const resultsGrid = document.getElementById("resultsGrid");
-const loadingState = document.getElementById("loadingState");
-const emptyState = document.getElementById("emptyState");
-
-const featuredCard = document.getElementById("featuredCard");
-const dragBounds = document.getElementById("dragBounds");
 const featuredImage = document.getElementById("featuredImage");
-const featuredDepartment = document.getElementById("featuredDepartment");
-const featuredDate = document.getElementById("featuredDate");
 const featuredTitle = document.getElementById("featuredTitle");
 const featuredArtist = document.getElementById("featuredArtist");
-const featuredCulture = document.getElementById("featuredCulture");
-const featuredMedium = document.getElementById("featuredMedium");
+const featuredDate = document.getElementById("featuredDate");
 const featuredLink = document.getElementById("featuredLink");
 
-const {
-  pointer,
-  inertia,
-  value
-} = window.popmotion;
+const featuredCard = document.getElementById("featuredCard");
+const dragArea = document.getElementById("dragArea");
 
-let artworks = [];
+const { pointer, inertia } = window.popmotion;
+
 let currentX = 0;
 let currentY = 0;
-let dragSession = null;
-let xMotionStop = null;
-let yMotionStop = null;
+let dragMove = null;
 
-function setStatus(message) {
-  statusText.textContent = message;
+searchBtn.addEventListener("click", function () {
+  const keyword = searchInput.value.trim();
+  if (keyword !== "") {
+    fetchArt(keyword);
+  }
+});
+
+async function fetchArt(keyword) {
+  statusText.textContent = "Status: Loading...";
+
+  try {
+    const searchUrl = `https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=${encodeURIComponent(keyword)}`;
+    const searchResponse = await fetch(searchUrl);
+    const searchData = await searchResponse.json();
+
+    if (!searchData.objectIDs || searchData.objectIDs.length === 0) {
+      resultsDiv.innerHTML = "<p>No results found.</p>";
+      statusText.textContent = "Status: No results found";
+      return;
+    }
+
+    const ids = searchData.objectIDs.slice(0, 8);
+
+    let artworks = [];
+
+    for (let i = 0; i < ids.length; i++) {
+      const objectResponse = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${ids[i]}`);
+      const objectData = await objectResponse.json();
+
+      if (objectData.primaryImageSmall) {
+        artworks.push(objectData);
+      }
+    }
+
+    if (artworks.length === 0) {
+      resultsDiv.innerHTML = "<p>No images found for this search.</p>";
+      statusText.textContent = "Status: No image results";
+      return;
+    }
+
+    showFeatured(artworks[0]);
+    showResults(artworks);
+    statusText.textContent = "Status: Loaded successfully";
+
+  } catch (error) {
+    console.log(error);
+    resultsDiv.innerHTML = "<p>Something went wrong.</p>";
+    statusText.textContent = "Status: Error loading data";
+  }
 }
 
-function showLoading(isLoading) {
-  loadingState.classList.toggle("hidden", !isLoading);
+function showFeatured(art) {
+  featuredImage.src = art.primaryImageSmall;
+  featuredTitle.textContent = art.title || "No title";
+  featuredArtist.textContent = art.artistDisplayName || "Unknown artist";
+  featuredDate.textContent = art.objectDate || "No date";
+  featuredLink.href = art.objectURL || "#";
+
+  currentX = 0;
+  currentY = 0;
+  featuredCard.style.transform = "translate(0px, 0px)";
 }
 
-function showEmpty(isEmpty) {
-  emptyState.classList.toggle("hidden", !isEmpty);
+function showResults(artworks) {
+  resultsDiv.innerHTML = "";
+
+  for (let i = 0; i < artworks.length; i++) {
+    const art = artworks[i];
+
+    const card = document.createElement("div");
+    card.className = "result-card";
+
+    card.innerHTML = `
+      <img src="${art.primaryImageSmall}" alt="${art.title}">
+      <h3>${art.title || "No title"}</h3>
+      <p><strong>Artist:</strong> ${art.artistDisplayName || "Unknown"}</p>
+      <p><strong>Date:</strong> ${art.objectDate || "Unknown"}</p>
+      <a href="${art.objectURL}" target="_blank">Open</a>
+    `;
+
+    resultsDiv.appendChild(card);
+  }
 }
 
-function resetResults() {
-  resultsGrid.innerHTML = "";
-  resultsSummary.textContent = "No results loaded yet.";
+function setCardPosition(x, y) {
+  currentX = x;
+  currentY = y;
+  featuredCard.style.transform = `translate(${x}px, ${y}px)`;
 }
 
-function clamp(valueToClamp, min, max) {
-  return Math.min(Math.max(valueToClamp, min), max);
-}
-
-function getCardBounds() {
-  const boundsRect = dragBounds.getBoundingClientRect();
+function getBounds() {
+  const areaRect = dragArea.getBoundingClientRect();
   const cardRect = featuredCard.getBoundingClientRect();
-
-  const maxX = Math.max(0, boundsRect.width - cardRect.width - 18);
-  const maxY = Math.max(0, boundsRect.height - cardRect.height - 18);
 
   return {
     minX: 0,
     minY: 0,
-    maxX,
-    maxY
+    maxX: areaRect.width - cardRect.width - 20,
+    maxY: areaRect.height - cardRect.height - 20
   };
 }
 
-function applyCardTransform(x, y) {
-  currentX = x;
-  currentY = y;
-  featuredCard.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-}
+featuredCard.addEventListener("mousedown", startDrag);
+featuredCard.addEventListener("touchstart", startDrag, { passive: false });
 
-function stopMotion() {
-  if (typeof xMotionStop === "function") {
-    xMotionStop();
-    xMotionStop = null;
+function startDrag(e) {
+  e.preventDefault();
+
+  if (dragMove) {
+    dragMove.stop();
   }
 
-  if (typeof yMotionStop === "function") {
-    yMotionStop();
-    yMotionStop = null;
-  }
-}
+  const startPoint = getPoint(e);
+  const startX = currentX;
+  const startY = currentY;
 
-function animateToBounds(velocityX = 0, velocityY = 0) {
-  stopMotion();
+  let lastX = startPoint.x;
+  let lastY = startPoint.y;
+  let velocityX = 0;
+  let velocityY = 0;
+  let lastTime = Date.now();
 
-  const bounds = getCardBounds();
-  const startX = clamp(currentX, bounds.minX, bounds.maxX);
-  const startY = clamp(currentY, bounds.minY, bounds.maxY);
+  dragMove = pointer().start(function (point) {
+    const newX = startX + (point.x - startPoint.x);
+    const newY = startY + (point.y - startPoint.y);
 
-  xMotionStop = inertia({
-    from: startX,
-    velocity: velocityX,
-    min: bounds.minX,
-    max: bounds.maxX,
-    bounceStiffness: 160,
-    bounceDamping: 12
-  }).start((x) => {
-    currentX = x;
-    featuredCard.style.transform = `translate3d(${x}px, ${currentY}px, 0)`;
+    setCardPosition(newX, newY);
+
+    const now = Date.now();
+    const dt = now - lastTime || 1;
+
+    velocityX = ((point.x - lastX) / dt) * 16;
+    velocityY = ((point.y - lastY) / dt) * 16;
+
+    lastX = point.x;
+    lastY = point.y;
+    lastTime = now;
   });
 
-  yMotionStop = inertia({
-    from: startY,
-    velocity: velocityY,
-    min: bounds.minY,
-    max: bounds.maxY,
-    bounceStiffness: 160,
-    bounceDamping: 12
-  }).start((y) => {
-    currentY = y;
-    featuredCard.style.transform = `translate3d(${currentX}px, ${y}px, 0)`;
-  });
-}
-
-function initDrag() {
-  let startPointerX = 0;
-  let startPointerY = 0;
-  let startCardX = 0;
-  let startCardY = 0;
-  let prevMoveTime = 0;
-  let prevPointerX = 0;
-  let prevPointerY = 0;
-  let lastVelocityX = 0;
-  let lastVelocityY = 0;
-
-  const endDrag = () => {
-    if (dragSession && typeof dragSession.stop === "function") {
-      dragSession.stop();
-      dragSession = null;
+  function endDrag() {
+    if (dragMove) {
+      dragMove.stop();
     }
+
+    const bounds = getBounds();
+
+    inertia({
+      from: currentX,
+      velocity: velocityX,
+      min: bounds.minX,
+      max: bounds.maxX
+    }).start(function (v) {
+      currentX = v;
+      featuredCard.style.transform = `translate(${currentX}px, ${currentY}px)`;
+    });
+
+    inertia({
+      from: currentY,
+      velocity: velocityY,
+      min: bounds.minY,
+      max: bounds.maxY
+    }).start(function (v) {
+      currentY = v;
+      featuredCard.style.transform = `translate(${currentX}px, ${currentY}px)`;
+    });
 
     document.removeEventListener("mouseup", endDrag);
     document.removeEventListener("touchend", endDrag);
+  }
 
-    animateToBounds(lastVelocityX, lastVelocityY);
-  };
-
-  const startDrag = (event) => {
-    event.preventDefault();
-    stopMotion();
-
-    const point = getPointerPoint(event);
-    startPointerX = point.x;
-    startPointerY = point.y;
-    startCardX = currentX;
-    startCardY = currentY;
-
-    prevMoveTime = performance.now();
-    prevPointerX = point.x;
-    prevPointerY = point.y;
-    lastVelocityX = 0;
-    lastVelocityY = 0;
-
-    dragSession = pointer().start((latest) => {
-      const now = performance.now();
-      const nextX = startCardX + (latest.x - startPointerX);
-      const nextY = startCardY + (latest.y - startPointerY);
-
-      const bounds = getCardBounds();
-      const clampedX = clamp(nextX, bounds.minX - 40, bounds.maxX + 40);
-      const clampedY = clamp(nextY, bounds.minY - 40, bounds.maxY + 40);
-
-      applyCardTransform(clampedX, clampedY);
-
-      const dt = Math.max(now - prevMoveTime, 1);
-      lastVelocityX = ((latest.x - prevPointerX) / dt) * 16;
-      lastVelocityY = ((latest.y - prevPointerY) / dt) * 16;
-
-      prevMoveTime = now;
-      prevPointerX = latest.x;
-      prevPointerY = latest.y;
-    });
-
-    document.addEventListener("mouseup", endDrag, { once: true });
-    document.addEventListener("touchend", endDrag, { once: true });
-  };
-
-  featuredCard.addEventListener("mousedown", startDrag);
-  featuredCard.addEventListener("touchstart", startDrag, { passive: false });
+  document.addEventListener("mouseup", endDrag);
+  document.addEventListener("touchend", endDrag);
 }
 
-function getPointerPoint(event) {
-  if (event.touches && event.touches.length > 0) {
+function getPoint(e) {
+  if (e.touches && e.touches.length > 0) {
     return {
-      x: event.touches[0].clientX,
-      y: event.touches[0].clientY
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY
     };
   }
 
   return {
-    x: event.clientX,
-    y: event.clientY
+    x: e.clientX,
+    y: e.clientY
   };
 }
 
-function normalizeArtwork(art) {
-  return {
-    id: art.objectID,
-    title: art.title || "Untitled",
-    artist: art.artistDisplayName || "Unknown artist",
-    date: art.objectDate || "Unknown date",
-    department: art.department || "Unknown department",
-    culture: art.culture || art.period || "Culture/period unavailable",
-    medium: art.medium || "Medium unavailable",
-    image: art.primaryImageSmall || art.primaryImage || "",
-    objectURL: art.objectURL || `https://www.metmuseum.org/art/collection/search/${art.objectID}`
-  };
-}
-
-async function searchArtwork(query, imageOnly) {
-  const url = new URL(MET_SEARCH_URL);
-  url.searchParams.set("q", query);
-
-  if (imageOnly) {
-    url.searchParams.set("hasImages", "true");
-  }
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error("Failed to search the Met API.");
-  }
-
-  return response.json();
-}
-
-async function fetchObjectById(id) {
-  const response = await fetch(`${MET_OBJECT_URL}/${id}`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch object ${id}.`);
-  }
-
-  return response.json();
-}
-
-async function loadArtworks(query) {
-  const limit = Number(limitSelect.value);
-  setStatus(`Searching for “${query}”...`);
-  showLoading(true);
-  showEmpty(false);
-  resetResults();
-
-  try {
-    const searchData = await searchArtwork(query, hasImagesOnly.checked);
-
-    if (!searchData.objectIDs || searchData.objectIDs.length === 0) {
-      artworks = [];
-      showEmpty(true);
-      setStatus("No artworks found.");
-      resultsSummary.textContent = `0 results for "${query}"`;
-      return;
-    }
-
-    const ids = searchData.objectIDs.slice(0, limit * 3);
-    const rawObjects = await Promise.allSettled(ids.map(fetchObjectById));
-
-    artworks = rawObjects
-      .filter((item) => item.status === "fulfilled")
-      .map((item) => normalizeArtwork(item.value))
-      .filter((art) => art.image)
-      .slice(0, limit);
-
-    if (artworks.length === 0) {
-      showEmpty(true);
-      setStatus("Results were found, but none had displayable images.");
-      resultsSummary.textContent = `0 image-ready results for "${query}"`;
-      return;
-    }
-
-    renderFeaturedArtwork(artworks[0]);
-    renderResults(artworks);
-    resultsSummary.textContent = `${artworks.length} result${artworks.length > 1 ? "s" : ""} for "${query}"`;
-    setStatus(`Loaded ${artworks.length} artworks for "${query}".`);
-  } catch (error) {
-    console.error(error);
-    showEmpty(true);
-    emptyState.innerHTML = `
-      <h4>Something went wrong</h4>
-      <p>Please try again in a moment.</p>
-    `;
-    setStatus("Error loading artwork.");
-    resultsSummary.textContent = "An error occurred.";
-  } finally {
-    showLoading(false);
-  }
-}
-
-function renderFeaturedArtwork(art) {
-  featuredImage.src = art.image || "";
-  featuredImage.alt = art.title;
-  featuredDepartment.textContent = art.department;
-  featuredDate.textContent = art.date;
-  featuredTitle.textContent = art.title;
-  featuredArtist.textContent = art.artist;
-  featuredCulture.textContent = art.culture;
-  featuredMedium.textContent = art.medium;
-  featuredLink.href = art.objectURL;
-
-  applyCardTransform(0, 0);
-  stopMotion();
-}
-
-function renderResults(items) {
-  resultsGrid.innerHTML = items
-    .map(
-      (art) => `
-        <article class="result-card">
-          <div class="result-image">
-            <img src="${art.image}" alt="${escapeHtml(art.title)}" loading="lazy" />
-          </div>
-          <div class="result-body">
-            <div class="result-meta">
-              <span class="tag">${escapeHtml(art.department)}</span>
-              <span class="tag soft">${escapeHtml(art.date)}</span>
-            </div>
-            <h4>${escapeHtml(art.title)}</h4>
-            <p><strong>${escapeHtml(art.artist)}</strong></p>
-            <p>${escapeHtml(art.medium)}</p>
-            <a
-              class="result-btn"
-              href="${art.objectURL}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Open artwork
-            </a>
-          </div>
-        </article>
-      `
-    )
-    .join("");
-}
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text ?? "";
-  return div.innerHTML;
-}
-
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const query = searchInput.value.trim();
-
-  if (!query) {
-    setStatus("Please enter a search term.");
-    return;
-  }
-
-  await loadArtworks(query);
-});
-
-window.addEventListener("resize", () => {
-  const bounds = getCardBounds();
-  applyCardTransform(
-    clamp(currentX, bounds.minX, bounds.maxX),
-    clamp(currentY, bounds.minY, bounds.maxY)
-  );
-});
-
-initDrag();
-loadArtworks(searchInput.value.trim());
+fetchArt("samurai");
