@@ -4,22 +4,150 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Met Art Explorer</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: white;
+      color: black;
+      margin: 20px;
+    }
+
+    h1, h2 {
+      margin-bottom: 10px;
+    }
+
+    .search-box {
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 8px;
+      width: 220px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 8px 12px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .main {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 30px;
+    }
+
+    .left, .right {
+      border: 1px solid #999;
+      padding: 15px;
+      background: #f9f9f9;
+    }
+
+    .left {
+      flex: 2;
+    }
+
+    .right {
+      flex: 1;
+    }
+
+    #dragArea {
+      width: 100%;
+      height: 480px;
+      border: 1px dashed #888;
+      position: relative;
+      overflow: hidden;
+      background: #eee;
+      margin-top: 10px;
+    }
+
+    #featuredCard {
+      width: 320px;
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      background: white;
+      border: 1px solid #666;
+      cursor: grab;
+    }
+
+    #featuredImage {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block;
+      background: #ddd;
+    }
+
+    .card-text {
+      padding: 10px;
+    }
+
+    .card-text h3 {
+      margin: 0 0 10px 0;
+      font-size: 20px;
+    }
+
+    .card-text p {
+      margin: 5px 0;
+    }
+
+    .card-text a {
+      display: inline-block;
+      margin-top: 10px;
+      color: blue;
+    }
+
+    #results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+    }
+
+    .result-card {
+      border: 1px solid #999;
+      background: #fafafa;
+      padding: 10px;
+    }
+
+    .result-card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      background: #ddd;
+      display: block;
+    }
+
+    .result-card h3 {
+      font-size: 18px;
+      margin: 10px 0 5px 0;
+    }
+
+    .result-card p {
+      margin: 4px 0;
+    }
+
+    .note {
+      color: #444;
+      font-size: 14px;
+    }
+  </style>
 </head>
 <body>
-
   <h1>Met Art Explorer</h1>
   <p>Search for artwork from The Met Museum API</p>
 
   <div class="search-box">
-    <input type="text" id="searchInput" placeholder="Enter a keyword" value="samurai">
+    <input type="text" id="searchInput" value="cat" placeholder="Enter keyword">
     <button id="searchBtn">Search</button>
   </div>
 
-  <div class="main-container">
-    <div class="left-panel">
+  <div class="main">
+    <div class="left">
       <h2>Featured Artwork</h2>
-      <p>Drag the card and release it to see Popmotion inertia.</p>
+      <p>Drag the card and release it to see the animation.</p>
 
       <div id="dragArea">
         <div id="featuredCard">
@@ -34,11 +162,12 @@
       </div>
     </div>
 
-    <div class="right-panel">
+    <div class="right">
       <h2>Project Info</h2>
       <p><strong>API:</strong> Met Museum API</p>
       <p><strong>Animation:</strong> Popmotion pointer() and inertia()</p>
       <p id="status">Status: Ready</p>
+      <p class="note">If Popmotion fails to load, the API still works.</p>
     </div>
   </div>
 
@@ -46,6 +175,235 @@
   <div id="results"></div>
 
   <script src="https://unpkg.com/popmotion/dist/popmotion.global.min.js"></script>
-  <script src="script.js"></script>
+  <script>
+    const searchInput = document.getElementById("searchInput");
+    const searchBtn = document.getElementById("searchBtn");
+    const resultsDiv = document.getElementById("results");
+    const statusText = document.getElementById("status");
+
+    const featuredImage = document.getElementById("featuredImage");
+    const featuredTitle = document.getElementById("featuredTitle");
+    const featuredArtist = document.getElementById("featuredArtist");
+    const featuredDate = document.getElementById("featuredDate");
+    const featuredLink = document.getElementById("featuredLink");
+
+    const featuredCard = document.getElementById("featuredCard");
+    const dragArea = document.getElementById("dragArea");
+
+    let currentX = 0;
+    let currentY = 0;
+
+    searchBtn.addEventListener("click", function () {
+      const keyword = searchInput.value.trim();
+      if (keyword) {
+        fetchArt(keyword);
+      }
+    });
+
+    async function fetchArt(keyword) {
+      statusText.textContent = "Status: Loading...";
+
+      try {
+        const searchUrl =
+          "https://collectionapi.metmuseum.org/public/collection/v1/search?hasImages=true&q=" +
+          encodeURIComponent(keyword);
+
+        const searchResponse = await fetch(searchUrl);
+        const searchData = await searchResponse.json();
+
+        if (!searchData.objectIDs || searchData.objectIDs.length === 0) {
+          resultsDiv.innerHTML = "<p>No results found.</p>";
+          statusText.textContent = "Status: No results found";
+          return;
+        }
+
+        const ids = searchData.objectIDs.slice(0, 8);
+        const artworks = [];
+
+        for (let i = 0; i < ids.length; i++) {
+          const objectUrl =
+            "https://collectionapi.metmuseum.org/public/collection/v1/objects/" + ids[i];
+
+          const objectResponse = await fetch(objectUrl);
+          const objectData = await objectResponse.json();
+
+          if (objectData.primaryImageSmall) {
+            artworks.push(objectData);
+          }
+        }
+
+        if (artworks.length === 0) {
+          resultsDiv.innerHTML = "<p>No image results found.</p>";
+          statusText.textContent = "Status: No images found";
+          return;
+        }
+
+        showFeatured(artworks[0]);
+        showResults(artworks);
+        statusText.textContent = "Status: Loaded successfully";
+      } catch (error) {
+        console.log(error);
+        resultsDiv.innerHTML = "<p>There was an error loading the API data.</p>";
+        statusText.textContent = "Status: Error";
+      }
+    }
+
+    function showFeatured(art) {
+      featuredImage.src = art.primaryImageSmall || "";
+      featuredTitle.textContent = art.title || "No title";
+      featuredArtist.textContent = art.artistDisplayName || "Unknown artist";
+      featuredDate.textContent = art.objectDate || "Unknown date";
+      featuredLink.href = art.objectURL || "#";
+
+      currentX = 0;
+      currentY = 0;
+      featuredCard.style.transform = "translate(0px, 0px)";
+    }
+
+    function showResults(artworks) {
+      resultsDiv.innerHTML = "";
+
+      for (let i = 0; i < artworks.length; i++) {
+        const art = artworks[i];
+
+        const card = document.createElement("div");
+        card.className = "result-card";
+
+        card.innerHTML = `
+          <img src="${art.primaryImageSmall}" alt="${art.title}">
+          <h3>${art.title || "No title"}</h3>
+          <p><strong>Artist:</strong> ${art.artistDisplayName || "Unknown"}</p>
+          <p><strong>Date:</strong> ${art.objectDate || "Unknown"}</p>
+          <a href="${art.objectURL}" target="_blank">Open</a>
+        `;
+
+        resultsDiv.appendChild(card);
+      }
+    }
+
+    function setupPopmotionDrag() {
+      if (!window.popmotion) {
+        console.log("Popmotion did not load.");
+        return;
+      }
+
+      const pointer = window.popmotion.pointer;
+      const inertia = window.popmotion.inertia;
+
+      if (!pointer || !inertia) {
+        console.log("Popmotion functions missing.");
+        return;
+      }
+
+      let dragMove = null;
+
+      featuredCard.addEventListener("mousedown", startDrag);
+      featuredCard.addEventListener("touchstart", startDrag, { passive: false });
+
+      function startDrag(e) {
+        e.preventDefault();
+
+        if (dragMove) {
+          dragMove.stop();
+        }
+
+        const startPoint = getPoint(e);
+        const startX = currentX;
+        const startY = currentY;
+
+        let lastX = startPoint.x;
+        let lastY = startPoint.y;
+        let velocityX = 0;
+        let velocityY = 0;
+        let lastTime = Date.now();
+
+        dragMove = pointer().start(function (point) {
+          const newX = startX + (point.x - startPoint.x);
+          const newY = startY + (point.y - startPoint.y);
+
+          setCardPosition(newX, newY);
+
+          const now = Date.now();
+          const dt = now - lastTime || 1;
+
+          velocityX = ((point.x - lastX) / dt) * 16;
+          velocityY = ((point.y - lastY) / dt) * 16;
+
+          lastX = point.x;
+          lastY = point.y;
+          lastTime = now;
+        });
+
+        function endDrag() {
+          if (dragMove) {
+            dragMove.stop();
+          }
+
+          const bounds = getBounds();
+
+          inertia({
+            from: currentX,
+            velocity: velocityX,
+            min: bounds.minX,
+            max: bounds.maxX
+          }).start(function (value) {
+            currentX = value;
+            featuredCard.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
+          });
+
+          inertia({
+            from: currentY,
+            velocity: velocityY,
+            min: bounds.minY,
+            max: bounds.maxY
+          }).start(function (value) {
+            currentY = value;
+            featuredCard.style.transform = "translate(" + currentX + "px, " + currentY + "px)";
+          });
+
+          document.removeEventListener("mouseup", endDrag);
+          document.removeEventListener("touchend", endDrag);
+        }
+
+        document.addEventListener("mouseup", endDrag);
+        document.addEventListener("touchend", endDrag);
+      }
+    }
+
+    function setCardPosition(x, y) {
+      currentX = x;
+      currentY = y;
+      featuredCard.style.transform = "translate(" + x + "px, " + y + "px)";
+    }
+
+    function getBounds() {
+      const areaRect = dragArea.getBoundingClientRect();
+      const cardRect = featuredCard.getBoundingClientRect();
+
+      return {
+        minX: 0,
+        minY: 0,
+        maxX: areaRect.width - cardRect.width - 20,
+        maxY: areaRect.height - cardRect.height - 20
+      };
+    }
+
+    function getPoint(e) {
+      if (e.touches && e.touches.length > 0) {
+        return {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY
+        };
+      }
+
+      return {
+        x: e.clientX,
+        y: e.clientY
+      };
+    }
+
+    setupPopmotionDrag();
+    fetchArt("cat");
+  </script>
 </body>
 </html>
